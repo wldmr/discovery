@@ -4,7 +4,7 @@
 
 use core::fmt::{self, Write};
 
-use aux11::{entry, iprint, iprintln, usart1};
+use aux11::{entry, usart1};
 use aux11::usart1::RegisterBlock;
 
 macro_rules! uprint {
@@ -38,12 +38,13 @@ impl fmt::Write for SerialPort {
 
 #[entry]
 fn main() -> ! {
-    let (usart1, _mono_timer, mut itm) = aux11::init();
+    let (usart1, _mono_timer, mut _itm) = aux11::init();
 
     let mut serial = SerialPort { usart1 };
 
-    uprintln!(serial, "The answer is {}", 40 + 2);
-    iprintln!(&mut itm.stim[0], "The answer is {}", 40 + 2);
-
-    loop {}
+    loop {
+        while serial.usart1.isr.read().rxne().bit_is_clear() {}
+        let byte = serial.usart1.rdr.read().rdr().bits() as u8 as char;
+        uprint!(serial, "{}", byte);
+    }
 }

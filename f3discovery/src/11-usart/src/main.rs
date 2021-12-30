@@ -4,8 +4,9 @@
 
 use core::fmt::{self, Write};
 
+use heapless::Vec;
+
 use aux11::{entry, usart1};
-use aux11::usart1::RegisterBlock;
 
 macro_rules! uprint {
     ($serial:expr, $($arg:tt)*) => {
@@ -36,15 +37,26 @@ impl fmt::Write for SerialPort {
     }
 }
 
+const ENTER: char = '\r';
+
 #[entry]
 fn main() -> ! {
     let (usart1, _mono_timer, mut _itm) = aux11::init();
 
     let mut serial = SerialPort { usart1 };
+    let mut buffer: Vec<char, 32> = Vec::new();
 
     loop {
         while serial.usart1.isr.read().rxne().bit_is_clear() {}
-        let byte = serial.usart1.rdr.read().rdr().bits() as u8 as char;
-        uprint!(serial, "{}", byte);
+        let char = serial.usart1.rdr.read().rdr().bits() as u8 as char;
+        if char == ENTER {
+            buffer.reverse();
+            uprintln!(serial, "");
+            buffer.iter().for_each(|c| uprint!(serial, "{}", c).unwrap());
+            uprintln!(serial, "");
+            buffer.clear();
+        } else if let Ok(()) = buffer.push(char) {
+            uprint!(serial, "{}", char);
+        }
     }
 }
